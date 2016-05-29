@@ -5,6 +5,7 @@ from . import util
 
 # Create your models here.
 
+
 class Pipeline(models.Model):
     STATUS = Choices(
         (3, 'WAITING'),

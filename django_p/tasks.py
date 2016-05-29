@@ -88,8 +88,8 @@ class InOrder(object):
             cls._local._activated = False
 
 
-
 class Pipe(object):
+
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
@@ -99,6 +99,7 @@ class Pipe(object):
 
 
 class Future(object):
+
     def __init__(self, pipe):
         self._after_all_pipelines = {}
         self._output_dict = {
@@ -108,7 +109,8 @@ class Future(object):
         for name in pipe.output_names:
             assert name not in self._output_dict
 
-            self._output_dict[name] = Slot.objects.update_or_create(filler=pipe, name=name)[1]
+            self._output_dict[name] = Slot.objects.update_or_create(
+                filler=pipe, name=name)[1]
 
     def __getattr__(self, name):
         if name not in self._output_dict:
@@ -229,7 +231,8 @@ def evaluate(pipeline_pk, purpose, attempt=0):
     for sub_stage in sub_stage_ordering:
         future = sub_stage_dict[sub_stage]
 
-        dependent_slots, output_slots, params = _generate_args(sub_stage, future)
+        dependent_slots, output_slots, params = _generate_args(
+            sub_stage, future)
 
         child_pipeline = Pipeline.objects.create(
             root_pipeline=pipeline,
@@ -243,5 +246,3 @@ def evaluate(pipeline_pk, purpose, attempt=0):
             purpose=Barrier.PURPOSE.START,
             blocking_slots=dependent_slots
         )
-
-
