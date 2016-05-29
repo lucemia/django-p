@@ -2,7 +2,55 @@ from .models import Pipeline, Slot, Barrier
 from django_q.tasks import async, result
 from datetime import datetime
 import threading
+import inspect
 
+
+class Future(object):
+
+    def __init__(self, pipe):
+        self._after_all_pipelines = {}
+        self._output_dict = {
+            'default': Slot.objects.update_or_create(filler_id=pipe.pk, name='default')[0]
+        }
+
+        for name in pipe.output_names:
+            assert name not in self._output_dict
+
+            self._output_dict[name] = Slot.objects.update_or_create(
+                filler_id=pipe.pk, name=name)[0]
+
+    def __getattr__(self, name):
+        if name not in self._output_dict:
+            raise
+        return self._output_dict[name]
+
+
+class Pipe(object):
+    output_names = []
+
+    def __init__(self, *args, **kwargs):
+        self._class_path = "%s.%s"%(self.__module__, self.__class__.__name__)
+        self.args = args
+        self.kwargs = kwargs
+
+    @property
+    def pk(self):
+        return self.pipeline_pk
+
+
+    def run(self):
+        raise NotImplementedError()
+
+    def start(self):
+        pipeline = Pipeline.objects.create(
+            class_path=self._class_path,
+        )
+        self.pipeline_pk = pipeline.pk
+        start(self)
+
+    @classmethod
+    def from_id(cls, id):
+        raise NotImplementedError()
 
 class After(object):
     """Causes all contained Pipelines to run after the given ones complete.
@@ -88,34 +136,7 @@ class InOrder(object):
             cls._local._activated = False
 
 
-class Pipe(object):
 
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-
-    def run(self):
-        pass
-
-
-class Future(object):
-
-    def __init__(self, pipe):
-        self._after_all_pipelines = {}
-        self._output_dict = {
-            'default': Slot.objects.update_or_create(filler=pipe, name='default')[1]
-        }
-
-        for name in pipe.output_names:
-            assert name not in self._output_dict
-
-            self._output_dict[name] = Slot.objects.update_or_create(
-                filler=pipe, name=name)[1]
-
-    def __getattr__(self, name):
-        if name not in self._output_dict:
-            raise
-        return self._output_dict[name]
 
 
 def _generate_args(pipeline, future):
@@ -125,11 +146,6 @@ def _generate_args(pipeline, future):
         'after_all': [],
         'output_slots': {},
         'class_path': pipeline._class_path,
-        'backoff_seconds': pipeline.backoff_seconds,
-        'backoff_factor': pipeline.backoff_factor,
-        'max_attempts': pipeline.max_attempts,
-        'task_retry': pipeline.task_retry,
-        'target': pipeline.target,
     }
     dependent_slots = set()
 
@@ -138,8 +154,8 @@ def _generate_args(pipeline, future):
         if isinstance(current_arg, Future):
             current_arg = current_arg.default
         if isinstance(current_arg, Slot):
-            arg_list.append({'type': 'slot', 'slot_key': str(current_arg.key)})
-            dependent_slots.add(current_arg.key)
+            arg_list.append({'type': 'slot', 'slot_key': str(current_arg.pk)})
+            dependent_slots.add(current_arg.pk)
         else:
             arg_list.append({'type': 'value', 'value': current_arg})
 
@@ -149,22 +165,22 @@ def _generate_args(pipeline, future):
             current_arg = current_arg.default
         if isinstance(current_arg, Slot):
             kwarg_dict[name] = {'type': 'slot',
-                                'slot_key': str(current_arg.key)}
-            dependent_slots.add(current_arg.key)
+                                'slot_key': str(current_arg.pk)}
+            dependent_slots.add(current_arg.pk)
         else:
             kwarg_dict[name] = {'type': 'value', 'value': current_arg}
 
     after_all = params['after_all']
     for other_future in future._after_all_pipelines:
-        slot_key = other_future._output_dict['default'].key
-        after_all.append(str(slot_key))
+        slot_key = other_future._output_dict['default'].pk
+        after_all.append(slot_key)
         dependent_slots.add(slot_key)
 
     output_slots = params['output_slots']
     output_slot_keys = set()
     for name, slot in future._output_dict.iteritems():
-        output_slot_keys.add(slot.key)
-        output_slots[name] = str(slot.key)
+        output_slot_keys.add(slot.pk)
+        output_slots[name] = slot.pk
 
     return dependent_slots, output_slot_keys, params
 
@@ -187,6 +203,26 @@ def fill_slot(filler, slot, value):
     slot.save()
 
     notify_barriers(slot)
+
+
+def start(pipe):
+
+    pipe.outputs = Future(pipe)
+    _, output_slots, params = _generate_args(pipe, pipe.outputs)
+
+    pipeline = Pipeline.objects.get(pk=pipe.pk)
+    pipeline.params = params
+    pipeline.save()
+
+    barrier = Barrier.objects.create(
+        target_id=pipe.pk,
+        status=Barrier.PURPOSE.FINALIZE
+    )
+    barrier.blocking_slots.add(*output_slots)
+
+
+    async(evaluate, pipe.pk, "start")
+
 
 
 def evaluate(pipeline_pk, purpose, attempt=0):
