@@ -31,6 +31,7 @@ class Pipeline(models.Model):
     # next_retry_time = models.DateTimeField()
     # retry_message = models.TextField()
 
+
     abort_message = models.TextField()
     abort_requested = models.BooleanField(default=False)
 
@@ -88,7 +89,7 @@ class Barrier(models.Model):
     status = models.IntegerField(choices=STATUS, default=STATUS.WAITING)
 
     def __unicode__(self):
-        return self.target
+        return unicode(self.target)
 
 # class Status(models.Model):
 #     root_pipeline = models.ForeignKey(Pipeline)

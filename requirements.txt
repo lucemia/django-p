@@ -1,0 +1,8 @@
+# A reusable Django field that allows you to store validated JSON in your model.
+# https://pypi.python.org/pypi/jsonfield/1.0.3
+jsonfield==1.0.3
+
+
+# Django model mixins and utilities
+# https://pypi.python.org/pypi/django-model-utils/2.5
+django-model-utils==2.5
