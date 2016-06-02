@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='barrier',
             name='target',
-            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to='django_p.Pipeline'),
+            field=models.OneToOneField(
+                on_delete=django.db.models.deletion.CASCADE, to='django_p.Pipeline'),
         ),
     ]
