@@ -11,17 +11,9 @@ class Future(object):
         self._after_all_pipelines = {}
         self.output = pipe.output
 
-    @property
-    def is_done(self):
-        return self._value.status == Slot.STATUS.FILLED
-
-    @property
-    def value(self):
-        if self.is_done:
-            return self._value
-
 
 class Pipe(object):
+
     def __init__(self, *args, **kwargs):
         self.pk = None
         self.args = args
@@ -91,12 +83,14 @@ def fill_slot(filler, slot, value):
     notify_barriers(slot)
     filler.save(status=Pipeline.STATUS.DONE)
 
+
 def evaluate(pipeline_pk):
     After._thread_init()
     InOrder._thread_init()
     InOrder._local._activated = False
 
     pipeline = Pipe.from_id(pipeline_pk)
+    print 'process', pipeline, pipeline.args, pipeline.kwargs
 
     # FIXME: handle not generator case
     pipeline_is_generator = util.is_generator_function(pipeline.run)

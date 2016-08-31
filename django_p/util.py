@@ -1,6 +1,7 @@
 import inspect
 import threading
 
+
 def is_generator_function(obj):
     """Return true if the object is a user-defined generator function."""
     CO_GENERATOR = 0x20
@@ -99,4 +100,3 @@ class InOrder(object):
         if not hasattr(cls._local, '_in_order_futures'):
             cls._local._in_order_futures = set()
             cls._local._activated = False
-
