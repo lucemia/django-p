@@ -16,6 +16,7 @@ class BarrierAdmin(admin.ModelAdmin):
 class SlotAdmin(admin.ModelAdmin):
     list_display = ('id', 'filler', 'value', 'status', 'filled')
 
+
 admin.site.register(Pipeline, PipelineAdmin)
 admin.site.register(Barrier, BarrierAdmin)
 admin.site.register(Slot, SlotAdmin)
