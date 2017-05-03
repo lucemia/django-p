@@ -10,7 +10,7 @@ def is_generator_function(obj):
 
 def import_class(name):
     components = name.split('.')
-    mod = __import__('.'.join(components), fromlist=[components[-1]])
+    mod = __import__('.'.join(components[:-1]), fromlist=[components[-1]])
     return getattr(mod, components[-1])
 
 
