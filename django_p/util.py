@@ -9,8 +9,9 @@ def is_generator_function(obj):
 
 
 def import_class(name):
-    mod = __import__('my_package.my_module', fromlist=['my_class'])
-    return getattr(mod, 'my_class')
+    components = name.split('.')
+    mod = __import__('.'.join(components), fromlist=[components[-1]])
+    return getattr(mod, components[-1])
 
 
 class After(object):
