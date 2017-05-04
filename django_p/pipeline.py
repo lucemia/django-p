@@ -105,7 +105,7 @@ def evaluate(pipeline_pk):
     kwargs = pipeline.kwargs
 
     if any(isinstance(k, Slot) for k in args) or any(isinstance(kwargs[k], Slot) for k in kwargs):
-        asnyc(evaluate, pipeline_pk)
+        async(evaluate, pipeline_pk)
         return
 
     if not pipeline_is_generator:
