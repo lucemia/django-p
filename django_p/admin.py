@@ -7,6 +7,8 @@ from .models import Pipeline, Barrier, Slot
 class PipelineAdmin(admin.ModelAdmin):
     list_display = ('id', 'class_path', 'root_pipeline',
                     'started', 'output', 'status')
+    search_fields = ('class_path', )
+    list_filter = ('status',)
 
 
 class BarrierAdmin(admin.ModelAdmin):
