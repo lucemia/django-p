@@ -37,21 +37,15 @@ class Pipeline(models.Model):
 
     message = models.TextField(blank=True)
 
-    def _to_value(self, v):
+    @classmethod
+    def _to_value(cls, v):
         if v['type'] == "value":
             return v['value']
         elif v['type'] == "Slot":
-            slot = Slot.objects.get(pk=v['slot_key'])
-            if slot.status == Slot.STATUS.FILLED:
-                return slot.value
-            else:
-                return slot
+            return Slot.objects.get(pk=v['slot_key'])
 
-    def _from_value(self, v):
-        from .pipeline import Future
-
-        if isinstance(v, Future):
-            v = v.output
+    @classmethod
+    def _from_value(cls, v):
         if isinstance(v, Slot):
             return {"type": "Slot", "slot_key": v.pk}
         else:
@@ -80,6 +74,10 @@ class Pipeline(models.Model):
     def __unicode__(self):
         return "%s:%s" % (self.class_path, self.pk)
 
+    @staticmethod
+    def autocomplete_search_fields():
+        return 'class_path',
+
 
 class Slot(models.Model):
     STATUS = Choices(
@@ -96,6 +94,10 @@ class Slot(models.Model):
 
     def __unicode__(self):
         return "%s:%s" % (self.filler, self.value)
+
+    @staticmethod
+    def autocomplete_search_fields():
+        return 'filler',
 
 
 class Barrier(models.Model):
@@ -118,6 +120,10 @@ class Barrier(models.Model):
 
     def __unicode__(self):
         return unicode(self.target)
+
+    @staticmethod
+    def autocomplete_search_fields():
+        return 'target',
 
 
 class Status(models.Model):

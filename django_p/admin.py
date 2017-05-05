@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Pipeline, Barrier, Slot
+from .models import Pipeline, Barrier, Slot, Status
 
 # Register your models here.
 
@@ -22,6 +22,11 @@ class SlotAdmin(admin.ModelAdmin):
     list_filter = ('status',)
 
 
+class StatusAdmin(admin.ModelAdmin):
+    list_display = ('id', 'pipeline', 'error', 'updated')
+    search_fields = ('pipeline', )
+
 admin.site.register(Pipeline, PipelineAdmin)
 admin.site.register(Barrier, BarrierAdmin)
 admin.site.register(Slot, SlotAdmin)
+admin.site.register(Status, StatusAdmin)

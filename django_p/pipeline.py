@@ -9,26 +9,29 @@ import traceback
 
 class Future(object):
 
-    def __init__(self, pipe):
+    def __init__(self, slot):
         self._after_all_pipelines = {}
-        self.output = pipe.output
+        self.output = slot
 
     @property
     def is_done(self):
-        return self._value.status == Slot.STATUS.FILLED
+        return self.output.status == Slot.STATUS.FILLED
 
     @property
     def value(self):
         if self.is_done:
-            return self._value
+            return self.output.value
+
+        raise Exception()
 
 
 class Pipe(object):
     def __init__(self, *args, **kwargs):
         self.pk = None
-        self.parent_pk = None
-        self.args = args
-        self.kwargs = kwargs
+        self.parent = None
+
+        self._args = [Future(k) if isinstance(k, Slot) else k for k in args]
+        self._kwargs = {k: Future(v) if isinstance(v, Slot) else v for k, v in kwargs.items()}
 
         self.class_path = "%s.%s" % (self.__module__, self.__class__.__name__)
         self.output = None
@@ -38,30 +41,44 @@ class Pipe(object):
         if self.pk:
             return Pipeline.objects.get(pk=self.pk)
 
+
     @classmethod
     def from_id(cls, id):
         pipeline = Pipeline.objects.get(id=id)
         klass = util.import_class(pipeline.class_path)
 
-        obj = klass(pipeline.parent_pipeline_id, *pipeline.args, **pipeline.kwargs)
+        obj = klass(*pipeline.args, **pipeline.kwargs)
         obj.pk = id
+        obj.parent = pipeline.parent_pipeline
         obj.output = pipeline.output
 
         return obj
 
+    def dependent_slots(self):
+        slots = set()
+        for arg in self._args:
+            if isinstance(arg, Future):
+                slots.add(arg.output)
+
+        for key, arg in self._kwargs.items():
+            if isinstance(arg, Future):
+                slots.add(arg.output)
+
+        return slots
+
     @transaction.atomic
-    def save(self, **kwargs):
+    def save(self):
         if self.pk:
             p = Pipeline.objects.get(pk=self.pk)
         else:
             # create new Pipeline
             p = Pipeline.objects.create(
                 class_path=self.class_path,
-                parent_pipeline_id=self.parent_pk
+                parent_pipeline=self.parent
             )
 
-            if self.parent_pk:
-                root = p
+            if p.parent_pipeline:
+                root = p.parent_pipeline
                 while not root.is_root_pipeline:
                     root = root.parent_pipeline
 
@@ -75,12 +92,9 @@ class Pipe(object):
             self.pk = p.pk
             self.output = p.output
 
-        p.args = self.args
-        p.kwargs = self.kwargs
+        p.args = [k.output if isinstance(k, Future) else k for k in self._args]
+        p.kwargs = {k: v.output if isinstance(v, Future) else v for k, v in self._kwargs.items()}
         p.output = self.output
-
-        for k in kwargs:
-            setattr(p, k, kwargs[k])
 
         p.save()
 
@@ -90,6 +104,26 @@ class Pipe(object):
     def start(self):
         self.save()
         async(evaluate, self.pk)
+
+
+    @property
+    def args(self):
+        return [k.value if isinstance(k, Future) else k for k in self._args]
+
+    @property
+    def kwargs(self):
+        return {k:v.value if isinstance(v, Future) else v for k, v in self._kwargs.items()}
+
+    def is_ready(self):
+        for arg in self.args:
+            if isinstance(arg, Future) and not arg.is_done:
+                return False
+
+        for arg in self.kwargs.values():
+            if isinstance(arg, Future) and not arg.is_done:
+                return False
+
+        return True
 
 
 def notify_barrier(barrier):
@@ -160,18 +194,12 @@ def evaluate(pipeline_pk):
     InOrder._local._activated = False
 
     pipe = Pipe.from_id(pipeline_pk)
+    args = pipe.args
+    kwargs = pipe.kwargs
+
     pipeline = pipe.pipeline
 
-    args = pipeline.args
-    kwargs = pipeline.kwargs
-
-    # Pipe should not start evaluate while input is not ready
-    assert not any(isinstance(k, Slot) for k in args)
-    assert not any(isinstance(kwargs[k], Slot) for k in kwargs)
-
-    # if any(isinstance(k, Slot) for k in args) or any(isinstance(kwargs[k], Slot) for k in kwargs):
-    #     async(evaluate, pipeline_pk)
-    #     return
+    assert pipe.is_ready()
 
     # if pipe is not generator, then process directly
     if not util.is_generator_function(pipe.run):
@@ -189,7 +217,6 @@ def evaluate(pipeline_pk):
     next_value = None
 
     try:
-        print pipe.run, args, kwargs
         pipeline_iter = pipe.run(*args, **kwargs)
     except Exception, e:
         exception(pipeline, e)
@@ -207,10 +234,10 @@ def evaluate(pipeline_pk):
         assert isinstance(yielded, Pipe)
         assert yielded not in sub_stage_dict
 
-        yielded.parent_pk = pipeline.pk
+        yielded.parent = pipeline
         yielded.save()
 
-        next_value = Future(yielded)
+        next_value = Future(yielded.output)
         next_value._after_all_pipelines.update(
             After._local._after_all_futures
         )
@@ -229,24 +256,16 @@ def evaluate(pipeline_pk):
 
     for sub_stage in sub_stage_ordering:
         future = sub_stage_dict[sub_stage]
-        child_pipeline = sub_stage
+        child_pipe = sub_stage
 
-        dependent_slots = set()
-        for arg in child_pipeline.args:
-            if isinstance(arg, Slot):
-                dependent_slots.add(arg)
-        for key, arg in child_pipeline.kwargs.iteritems():
-            if isinstance(arg, Slot):
-                dependent_slots.add(arg)
+        dependent_slots = child_pipe.dependent_slots()
 
         for other_future in future._after_all_pipelines:
             slot = other_future.output
             dependent_slots.add(slot)
 
-        # dependent_slots.add(future.output)
-
         barrier = Barrier.objects.create(
-            target_id=child_pipeline.pk,
+            target_id=child_pipe.pk,
         )
         barrier.blocking_slots.add(*dependent_slots)
         barrier.save()
