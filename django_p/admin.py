@@ -14,6 +14,7 @@ class PipelineAdmin(admin.ModelAdmin):
 class BarrierAdmin(admin.ModelAdmin):
     list_display = ('id', 'target', 'triggered', 'status')
     list_filter = ('status',)
+    search_fields = ('target__class_path', )
 
 
 class SlotAdmin(admin.ModelAdmin):

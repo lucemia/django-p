@@ -32,8 +32,10 @@ class Pipeline(models.Model):
     # next_retry_time = models.DateTimeField()
     # retry_message = models.TextField()
 
-    abort_message = models.TextField()
+    abort_message = models.TextField(blank=True)
     abort_requested = models.BooleanField(default=False)
+
+    message = models.TextField(blank=True)
 
     def _to_value(self, v):
         if v['type'] == "value":
@@ -93,7 +95,7 @@ class Slot(models.Model):
     filled = models.DateTimeField(auto_now=True)
 
     def __unicode__(self):
-        return "%s:%s" % (self.filler, self.value if self.status == Slot.STATUS.FILLED else "waiting")
+        return "%s:%s" % (self.filler, self.value)
 
 
 class Barrier(models.Model):
@@ -117,8 +119,13 @@ class Barrier(models.Model):
     def __unicode__(self):
         return unicode(self.target)
 
-# class Status(models.Model):
-#     root_pipeline = models.ForeignKey(Pipeline)
-#     message = models.TextField()
 
-#     updated = models.DateTimeField(auto_now=True)
+class Status(models.Model):
+    pipeline = models.ForeignKey(Pipeline, related_name="pipeline_status")
+    error = models.TextField()
+    message = models.TextField()
+
+    updated = models.DateTimeField(auto_now=True)
+
+    def __unicode__(self):
+        return u"%s:%s" % (self.pipeline, self.error)
