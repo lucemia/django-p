@@ -91,6 +91,7 @@ def fill_slot(filler, slot, value):
     notify_barriers(slot)
     filler.save(status=Pipeline.STATUS.DONE)
 
+
 def evaluate(pipeline_pk):
     After._thread_init()
     InOrder._thread_init()
@@ -174,4 +175,5 @@ def evaluate(pipeline_pk):
             target_id=child_pipeline.pk,
         )
         barrier.blocking_slots.add(*dependent_slots)
+        barrier.save()
         notify_barrier(barrier)

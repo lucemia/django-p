@@ -13,10 +13,12 @@ class PipelineAdmin(admin.ModelAdmin):
 
 class BarrierAdmin(admin.ModelAdmin):
     list_display = ('id', 'target', 'triggered', 'status')
+    list_filter = ('status',)
 
 
 class SlotAdmin(admin.ModelAdmin):
     list_display = ('id', 'filler', 'value', 'status', 'filled')
+    list_filter = ('status',)
 
 
 admin.site.register(Pipeline, PipelineAdmin)
