@@ -66,7 +66,7 @@ class Pipeline(models.Model):
 
     @kwargs.setter
     def kwargs(self, value):
-        self.params['kwargs'] = {k: self._from_value(k) for k in value}
+        self.params['kwargs'] = {k: self._from_value(value[k]) for k in value}
 
     @property
     def is_root_pipeline(self):
