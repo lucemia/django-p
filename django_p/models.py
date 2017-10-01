@@ -32,24 +32,20 @@ class Pipeline(models.Model):
     # next_retry_time = models.DateTimeField()
     # retry_message = models.TextField()
 
-    abort_message = models.TextField()
+    abort_message = models.TextField(blank=True)
     abort_requested = models.BooleanField(default=False)
 
-    def _to_value(self, v):
+    message = models.TextField(blank=True)
+
+    @classmethod
+    def _to_value(cls, v):
         if v['type'] == "value":
             return v['value']
         elif v['type'] == "Slot":
-            slot = Slot.objects.get(pk=v['slot_key'])
-            if slot.status == Slot.STATUS.FILLED:
-                return slot.value
-            else:
-                return slot
+            return Slot.objects.get(pk=v['slot_key'])
 
-    def _from_value(self, v):
-        from .pipeline import Future
-
-        if isinstance(v, Future):
-            v = v.output
+    @classmethod
+    def _from_value(cls, v):
         if isinstance(v, Slot):
             return {"type": "Slot", "slot_key": v.pk}
         else:
@@ -78,6 +74,10 @@ class Pipeline(models.Model):
     def __unicode__(self):
         return "%s:%s" % (self.class_path, self.pk)
 
+    @staticmethod
+    def autocomplete_search_fields():
+        return 'class_path',
+
 
 class Slot(models.Model):
     STATUS = Choices(
@@ -93,7 +93,11 @@ class Slot(models.Model):
     filled = models.DateTimeField(auto_now=True)
 
     def __unicode__(self):
-        return "%s:%s" % (self.filler, self.value if self.status == Slot.STATUS.FILLED else "waiting")
+        return "%s:%s" % (self.filler, self.value)
+
+    @staticmethod
+    def autocomplete_search_fields():
+        return 'filler',
 
 
 class Barrier(models.Model):
@@ -117,8 +121,17 @@ class Barrier(models.Model):
     def __unicode__(self):
         return unicode(self.target)
 
-# class Status(models.Model):
-#     root_pipeline = models.ForeignKey(Pipeline)
-#     message = models.TextField()
+    @staticmethod
+    def autocomplete_search_fields():
+        return 'target',
 
-#     updated = models.DateTimeField(auto_now=True)
+
+class Status(models.Model):
+    pipeline = models.ForeignKey(Pipeline, related_name="pipeline_status")
+    error = models.TextField()
+    message = models.TextField()
+
+    updated = models.DateTimeField(auto_now=True)
+
+    def __unicode__(self):
+        return u"%s:%s" % (self.pipeline, self.error)
