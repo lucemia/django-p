@@ -41,7 +41,7 @@ class Pipeline(models.Model):
     @classmethod
     def _to_value(cls, v):
         if v['type'] == "value":
-            return cPickle.loads(v['value'])
+            return cPickle.loads(str(v['value']))
         elif v['type'] == "Slot":
             return Slot.objects.get(pk=v['slot_key'])
 
