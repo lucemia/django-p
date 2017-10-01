@@ -65,7 +65,7 @@ class Pipeline(models.Model):
 
     @property
     def kwargs(self):
-        return {k: self._to_value(self._kwargs[k]) for k in self.params['kwargs']}
+        return {k: self._to_value(self.params['kwargs'][k]) for k in self.params['kwargs']}
 
     @kwargs.setter
     def kwargs(self, value):
