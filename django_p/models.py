@@ -2,6 +2,7 @@ from django.db import models
 from jsonfield import JSONField
 from model_utils import Choices
 import util
+import cPickle
 # Create your models here.
 
 
@@ -40,7 +41,7 @@ class Pipeline(models.Model):
     @classmethod
     def _to_value(cls, v):
         if v['type'] == "value":
-            return v['value']
+            return cPickle.loads(v['value'])
         elif v['type'] == "Slot":
             return Slot.objects.get(pk=v['slot_key'])
 
@@ -49,7 +50,7 @@ class Pipeline(models.Model):
         if isinstance(v, Slot):
             return {"type": "Slot", "slot_key": v.pk}
         else:
-            return {"type": "value", "value": v}
+            return {"type": "value", "value": cPickle.dumps(v)}
 
     @property
     def args(self):
