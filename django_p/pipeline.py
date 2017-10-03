@@ -80,16 +80,9 @@ class Pipe(object):
             )
 
             if p.parent_pipeline:
-                root = p.parent_pipeline
-                while not root.is_root_pipeline:
-                    root = root.parent_pipeline
+                p.root_pipeline = p.parent_pipeline.root_pipeline
 
-                p.root_pipeline = root
-
-            # CHECK: p.output may be share with the same slot with other pipeline
-            # need to check it is right design
-            if not p.output:
-                p.output = Slot.objects.create()
+            p.output = Slot.objects.create()
 
             self.pk = p.pk
             self.output = p.output
@@ -158,27 +151,23 @@ def update_pipeline_status(pipeline):
 
 
 def fill_slot(pipeline, slot, value):
-    with transaction.atomic():
-        slot.filler = pipeline
-        slot.value = value
-        slot.status = Slot.STATUS.FILLED
-        slot.save()
+    if isinstance(value, Slot):
+        with transaction.atomic():
+            slot.filler = pipeline
+            slot.reference_slot = value
+            slot.save()
+    else:
+        with transaction.atomic():
+            slot.filler = pipeline
+            slot.value = value
+            slot.status = Slot.STATUS.FILLED
+            slot.save()
 
-    notify_barriers(slot)
-    update_pipeline_status(pipeline)
+        notify_barriers(slot)
+        update_pipeline_status(pipeline)
 
-
-@transaction.atomic
-def switch_slot(org_slot, new_slot):
-    for barrier in org_slot.barrier_set.all():
-        barrier.blocking_slots.remove(org_slot)
-        barrier.blocking_slots.add(new_slot)
-
-    for pipeline in org_slot.pipeline_set.all():
-        pipeline.output = new_slot
-        pipeline.save()
-
-    org_slot.delete()
+        for _slot in slot.slot_set.all():
+            fill_slot(pipeline, _slot, value)
 
 
 def exception(pipeline, e):
@@ -198,12 +187,14 @@ def evaluate(pipeline_pk):
     args = pipe.args
     kwargs = pipe.kwargs
 
-    pipeline = pipe.pipeline
-
     assert pipe.is_ready()
 
-    # if pipe is not generator, then process directly
+    pipeline = pipe.pipeline
+    pipeline.status = pipeline.STATUS.RUN
+    pipeline.save()
+
     if not util.is_generator_function(pipe.run):
+        # HINT: if pipe is not a generator, then process directly
         try:
             result = pipe.run(*args, **kwargs)
         except Exception as e:
@@ -250,20 +241,19 @@ def evaluate(pipeline_pk):
         InOrder._add_future(next_value)
 
     if not sub_stage_ordering:
+        # HINT: the pipeline iter didn't return anything
         return fill_slot(pipeline, pipeline.output, None)
 
-    # CHECK: should share the output?
-    switch_slot(pipeline.output, sub_stage_ordering[-1].output)
+    fill_slot(sub_stage_ordering[-1].pipeline, pipeline.output, sub_stage_ordering[-1].output)
 
     for sub_stage in sub_stage_ordering:
         future = sub_stage_dict[sub_stage]
         child_pipe = sub_stage
 
+        # HINT, the child pipe's dependent include it's args, kwargs
+        # and all pipeline record in _after_all_pipelines
         dependent_slots = child_pipe.dependent_slots()
-
-        for other_future in future._after_all_pipelines:
-            slot = other_future.output
-            dependent_slots.add(slot)
+        dependent_slots.update(_future.output for _future in future._after_all_pipelines)
 
         barrier = Barrier.objects.create(
             target_id=child_pipe.pk,

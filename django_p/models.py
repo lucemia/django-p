@@ -90,6 +90,7 @@ class Slot(models.Model):
 
     value = JSONField(default=None)
     status = models.IntegerField(choices=STATUS, default=STATUS.WAITING)
+    reference_slot = models.ForeignKey('self', null=True)
 
     filled = models.DateTimeField(auto_now=True)
 
