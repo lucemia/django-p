@@ -1,4 +1,3 @@
-from django.test import TestCase
 from .models import Pipe
 
 # Create your tests here.

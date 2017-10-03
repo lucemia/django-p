@@ -1,6 +1,7 @@
 import inspect
 import threading
 
+
 def is_generator_function(obj):
     """Return true if the object is a user-defined generator function."""
     CO_GENERATOR = 0x20
@@ -29,6 +30,8 @@ class After(object):
           *futures: PipelineFutures that all subsequent pipelines should follow.
             May be empty, in which case this statement does nothing.
         """
+        from .pipelines import Future
+
         for f in futures:
             if not isinstance(f, Future):
                 raise TypeError(
@@ -81,7 +84,9 @@ class InOrder(object):
         # on the same thread, and all pipelines are executed in order in test mode
         # anyway, so disable InOrder for tests.
         InOrder._thread_init()
+
         assert not InOrder._local._activated, 'Already in an InOrder "with" block.'
+
         InOrder._local._activated = True
         InOrder._local._in_order_futures.clear()
 
@@ -89,6 +94,7 @@ class InOrder(object):
         """When exiting a 'with' block."""
         InOrder._local._activated = False
         InOrder._local._in_order_futures.clear()
+
         return False
 
     @classmethod

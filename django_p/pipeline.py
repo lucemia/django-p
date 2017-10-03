@@ -1,10 +1,13 @@
-from .models import Pipeline, Slot, Barrier, Status
-from django_q.tasks import async
-from django.db import transaction
-from datetime import datetime
-import util
-from util import After, InOrder
 import traceback
+from datetime import datetime
+
+from django.db import transaction
+
+import util
+from django_q.tasks import async
+from util import After, InOrder
+
+from .models import Barrier, Pipeline, Slot, Status
 
 
 class Future(object):
@@ -40,7 +43,6 @@ class Pipe(object):
     def pipeline(self):
         if self.pk:
             return Pipeline.objects.get(pk=self.pk)
-
 
     @classmethod
     def from_id(cls, id):
@@ -105,14 +107,13 @@ class Pipe(object):
         self.save()
         async(evaluate, self.pk)
 
-
     @property
     def args(self):
         return [k.value if isinstance(k, Future) else k for k in self._args]
 
     @property
     def kwargs(self):
-        return {k:v.value if isinstance(v, Future) else v for k, v in self._kwargs.items()}
+        return {k: v.value if isinstance(v, Future) else v for k, v in self._kwargs.items()}
 
     def is_ready(self):
         for arg in self.args:

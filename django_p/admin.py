@@ -26,6 +26,7 @@ class StatusAdmin(admin.ModelAdmin):
     list_display = ('id', 'pipeline', 'error', 'updated')
     search_fields = ('pipeline', )
 
+
 admin.site.register(Pipeline, PipelineAdmin)
 admin.site.register(Barrier, BarrierAdmin)
 admin.site.register(Slot, SlotAdmin)
