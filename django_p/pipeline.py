@@ -13,7 +13,7 @@ from .models import Barrier, Pipeline, Slot, Status
 class Future(object):
 
     def __init__(self, slot):
-        self._after_all_pipelines = {}
+        self._after_all_pipelines = []
         self.output = slot
 
     @property
@@ -239,10 +239,10 @@ def evaluate(pipeline_pk):
         yielded.save()
 
         next_value = Future(yielded.output)
-        next_value._after_all_pipelines.update(
+        next_value._after_all_pipelines.extend(
             After._local._after_all_futures
         )
-        next_value._after_all_pipelines.update(
+        next_value._after_all_pipelines.extend(
             InOrder._local._in_order_futures
         )
         sub_stage_dict[yielded] = next_value
